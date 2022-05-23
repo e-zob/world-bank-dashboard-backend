@@ -19,9 +19,9 @@ await db.query(
 
 await db.query(
   `CREATE TABLE sessions (
-    session_id TEXT PRIMARY KEY,
+    uuid TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
-    FOREIGN KEY(user_id) REFERENCES users(id)
+    created_at DATE NOT NULL
     )`
 );
 
