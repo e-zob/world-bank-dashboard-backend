@@ -9,6 +9,7 @@ const PORT = 8080;
 
 app
   .post("./session", logIn)
+  .post("./user", createAccount)
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -36,4 +37,13 @@ async function logIn(server) {
     });
   }
   return isValidPassword ? server.json({ response: "Success" }, 200) : server.json({ response: "Invalid Password" }, 400);
+}
+
+async function createAccount(server) {
+  const { username, password } = await server.body;
+  const salt = await bcrypt.genSalt;
+  const encryptedPassword = await bcrypt.hash(password, salt);
+  const query = `INSERT INTO users (username, password, salt) VALUES (?,?,?)`;
+  await userdb.query(query, [username, encryptedPassword, salt]);
+  return server.json({ response: "Success" }, 200);
 }
