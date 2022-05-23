@@ -24,3 +24,19 @@ await db.query(
     FOREIGN KEY(user_id) REFERENCES users(id)
     )`
 );
+
+await db.query(
+  `CREATE TABLE searches (
+        search_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        country TEXT,
+        indicator TEXT,
+        year DATE
+    )`
+);
+
+await db.query(
+  `CREATE TABLE user_searches(
+        user_id INTEGER NOT NULL,
+        search_id INTEGER NOT NULL
+    )`
+);
