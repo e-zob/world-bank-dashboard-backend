@@ -38,7 +38,7 @@ async function logIn(server) {
   const user = await getUser(username);
   if (!user) return server.json({ response: "User not found" }, 400);
   const encryptedPassword = await bcrypt.hash(password, user.salt);
-  const isValidPassword = encryptedPassword === password;
+  const isValidPassword = encryptedPassword === user.password;
   if (isValidPassword) {
     const sessionId = v4.generate();
     await users.queryArray("INSERT INTO sessions (uuid, user_id, created_at) VALUES (?, ?, datetime('now'))", [sessionId, user.id]);
