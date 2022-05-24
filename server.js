@@ -12,7 +12,7 @@ const users = new Client("postgres://dzmurumb:6ZSO9Eo4oiMkZ-GOEYmkwt7fTOXpexW-@k
 await users.connect();
 
 const app = new Application();
-
+const PORT = 8080;
 app
   .get("/hash/:pass", async (server) => {
     const { pass } = server.params;
