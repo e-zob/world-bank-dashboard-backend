@@ -2,6 +2,7 @@ import { Application } from "https://deno.land/x/abc@v1.3.3/mod.ts";
 import { DB } from "https://deno.land/x/sqlite/mod.ts";
 import { abcCors } from "https://deno.land/x/cors/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
+import { v4 } from "https://deno.land/std@0.140.0/uuid/mod.ts";
 import { Client } from "https://deno.land/x/postgres@v0.11.3/mod.ts";
 
 //denon run --allow-read --allow-write --allow-net --allow-env server.js
@@ -41,7 +42,7 @@ async function logIn(server) {
   const isValidPassword = encryptedPassword === user.password;
   if (isValidPassword) {
     const sessionId = v4.generate();
-    await users.queryArray("INSERT INTO sessions (uuid, user_id, created_at) VALUES (?, ?, datetime('now'))", [sessionId, user.id]);
+    await users.queryArray("INSERT INTO sessions (uuid, user_id, created_at) VALUES ($1, $2, current_timestamp)", sessionId, user.id);
     server.setCookie({
       name: "sessionId",
       value: sessionId,
