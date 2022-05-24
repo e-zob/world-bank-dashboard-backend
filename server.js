@@ -19,9 +19,7 @@ await users.connect();
 const app = new Application();
 const PORT = Number(Deno.env.get("PORT"));
 app
-  // .get("/", async (server) => {
-  //   return server.json({ response: "Backend deployed" });
-  // })
+  .get("/", welcome)
   .post("/sessions", logIn)
   .post("/users", createAccount)
   .use(
@@ -34,6 +32,10 @@ app
   .start({ port: PORT });
 
 console.log(`Server running on http://localhost:${PORT}`);
+
+async function welcome(server) {
+  return server.json({ response: "Backend deployed" });
+}
 
 async function logIn(server) {
   const { username, password } = await server.body;
