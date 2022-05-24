@@ -4,6 +4,8 @@ import { abcCors } from "https://deno.land/x/cors/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
 import { Client } from "https://deno.land/x/postgres@v0.11.3/mod.ts";
 
+//denon run --allow-read --allow-write --allow-net --allow-env server.js
+
 const wb = new Client("postgres://czreijar:TJ2StTuQIl2CoRoinQTwPxk8pBGfdf6t@kandula.db.elephantsql.com/czreijar");
 await wb.connect();
 const users = new Client("postgres://dzmurumb:6ZSO9Eo4oiMkZ-GOEYmkwt7fTOXpexW-@kesavan.db.elephantsql.com/dzmurumb");
@@ -17,7 +19,7 @@ app
     const salt = await bcrypt.genSalt();
     const encryptedPassword = await bcrypt.hash(pass, salt);
     return server.json(encryptedPassword);
-  })
+  }) //to be deleted
   .post("/sessions", logIn)
   .post("/users", createAccount)
   .use(
