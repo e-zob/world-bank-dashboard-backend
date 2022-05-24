@@ -1,26 +1,24 @@
+//denon run --allow-read --allow-write --allow-net --allow-env server.js
+//https://arcane-shore-12026.herokuapp.com/
 import { Application } from "https://deno.land/x/abc@v1.3.3/mod.ts";
-import { DB } from "https://deno.land/x/sqlite/mod.ts";
 import { abcCors } from "https://deno.land/x/cors/mod.ts";
 import * as bcrypt from "https://deno.land/x/bcrypt/mod.ts";
 import { v4 } from "https://deno.land/std@0.140.0/uuid/mod.ts";
 import { Client } from "https://deno.land/x/postgres@v0.11.3/mod.ts";
+import { config } from "https://deno.land/x/dotenv/mod.ts";
 
-//denon run --allow-read --allow-write --allow-net --allow-env server.js
+const DENO_ENV = Deno.env.get("DENO_ENV") ?? "development";
 
-const wb = new Client("postgres://czreijar:TJ2StTuQIl2CoRoinQTwPxk8pBGfdf6t@kandula.db.elephantsql.com/czreijar");
+config({ path: `./.env.${DENO_ENV}`, export: true });
+
+const wb = new Client(Deno.env.get("PG_WB_DB"));
 await wb.connect();
-const users = new Client("postgres://dzmurumb:6ZSO9Eo4oiMkZ-GOEYmkwt7fTOXpexW-@kesavan.db.elephantsql.com/dzmurumb");
+const users = new Client(Deno.env.get("PG_USERS_DB"));
 await users.connect();
 
 const app = new Application();
-const PORT = 8080;
+const PORT = Number(Deno.env.get("PORT"));
 app
-  .get("/hash/:pass", async (server) => {
-    const { pass } = server.params;
-    const salt = await bcrypt.genSalt();
-    const encryptedPassword = await bcrypt.hash(pass, salt);
-    return server.json(encryptedPassword);
-  }) //to be deleted
   .post("/sessions", logIn)
   .post("/users", createAccount)
   .use(
