@@ -1,1 +1,1 @@
-web: DENO_ENV=production denon run --allow-net --allow-read --allow-env --unstable server.js
+web: DENO_ENV=production deno run --allow-net --allow-read --allow-env --unstable server.js
