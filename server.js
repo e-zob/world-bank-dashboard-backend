@@ -82,6 +82,7 @@ async function createAccount(server) {
 async function deleteAccount(server) {
   const { username } = await server.body;
   await users.queryArray("DELETE FROM users WHERE username=$1", username);
+  return server.json({ response: "Deleted successfully" }, 200);
 }
 
 async function search(server) {
