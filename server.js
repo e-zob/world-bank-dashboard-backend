@@ -44,7 +44,7 @@ app
 console.log(`Server running on http://localhost:${PORT}`);
 
 async function welcome(server) {
-  return server.json({ response: "Backend deployed" });
+  return server.json({ response: "Welcome to world-bank-dashboard api, don't forget to deploy after every commit!" });
 }
 
 async function logIn(server) {
@@ -94,7 +94,11 @@ async function search(server) {
   const { isOneCountry, isTwoCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
   if (isOneCountry && !indicator && isAllTime) allIndicatorsForCountryAllTime(countries[0]);
   if (isOneCountry && indicator && isAllTime) {
-    await indicatorForCountryAllTime(currentUser, countries[0], indicator);
+    await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
+    return server.json({ response: "Search added successfully" }, 200);
+  }
+  if (isOneCountry && indicator && isOneYear) {
+    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
   }
 }
@@ -111,6 +115,7 @@ async function getSearch(server) {
   const { searchId } = server.params;
   const query = `SELECT query, parameters FROM searches WHERE id=$1`;
   const [searchDetails] = (await users.queryObject(query, searchId)).rows;
+  if (!searchDetails) return server.json({ response: "Search not found" }, 404);
   const params = Object.values(searchDetails.parameters);
   const data = (await wb.queryObject(searchDetails.query, ...params)).rows;
   return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
@@ -119,11 +124,19 @@ async function getSearch(server) {
 async function allIndicatorsForCountryAllTime(country) {
   return;
 }
-async function indicatorForCountryAllTime(currentUser, country, indicator) {
-  const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=${indicator})`;
+async function indicatorOneCountryAllTime(currentUser, country, indicator) {
+  const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator})`;
+  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3)`;
   const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
   const info = JSON.stringify({ countries: [country], years: [] });
-  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3)`;
+  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+}
+
+async function indicatorOneCountryOneYear(currentUser, country, indicator, year) {
+  const full_query = `SELECT value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year=${year}`;
+  const query = `SELECT value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year=$4`;
+  const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator, 4: year });
+  const info = JSON.stringify({ countries: [country], years: [year], indicator: indicator });
   await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
 }
 
