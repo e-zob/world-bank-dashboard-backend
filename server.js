@@ -101,6 +101,7 @@ async function search(server) {
 async function getAllIndicatorsForCountryAllTime(country) {
   return;
 }
+
 async function getIndicatorForCountryAllTime(country, indicator) {
   const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=${indicator})`;
   const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
@@ -111,7 +112,11 @@ async function getIndicatorForCountryAllTime(country, indicator) {
     data.years.push(obj.year);
     data.values.push(obj.value);
   });
+  const sessionId = server.cookies.sessionId;
+  const currentUser = getCurrentUser(sessionId);
   await addSearch(full_query, indicator, query, parameters);
+  const searchId = await getSearchId(full_query);
+  await addHistory(currentUser, searchId);
   return data;
 }
 
@@ -122,8 +127,9 @@ async function getUser(username) {
 }
 
 async function getCurrentUser(sessionId) {
-  const query = `SELECT `;
-  const [user] = "";
+  const query = `SELECT user_id FROM sessions WHERE uuid=$1`;
+  const [user] = (await users.queryObject(query, sessionId)).rows;
+  return user;
 }
 
 async function addSearch(full_query, search_title, p_query, params) {
@@ -135,7 +141,7 @@ async function addSearch(full_query, search_title, p_query, params) {
 }
 
 async function getSearchId(full_query) {
-  const query = `SELECT id FROM searches WHERE query= $1`;
+  const query = `SELECT id FROM searches WHERE full_query= $1`;
   const [id] = (await users.queryObject(query, full_query)).rows;
   return id;
 }
