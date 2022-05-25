@@ -29,7 +29,8 @@ app
   .delete("/sessions", logOut)
   .post("/users", createAccount)
   .delete("/users", deleteAccount) //testing only
-  .get("/search", search)
+  .post("/search", search)
+  .get("/history", getHistory)
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -87,33 +88,58 @@ async function deleteAccount(server) {
 
 async function search(server) {
   const { countries, years, indicator } = await server.body;
+  const sessionId = server.cookies.sessionId;
+  const currentUser = await getCurrentUser(sessionId);
+  const { isOneCountry, isTwoCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
+  if (isOneCountry && !indicator && isAllTime) AllIndicatorsForCountryAllTime(countries[0]);
+  if (isOneCountry && indicator && isAllTime) {
+    await IndicatorForCountryAllTime(currentUser, countries[0], indicator);
+    return server.json({ response: "Search added successfully" }, 200);
+  }
+}
+
+async function AllIndicatorsForCountryAllTime(country) {
+  return;
+}
+async function IndicatorForCountryAllTime(currentUser, country, indicator) {
+  const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=${indicator})`;
+  const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
+  const info = JSON.stringify({ countries: [country], years: [] });
+  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=$3)`;
+  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+}
+
+function getSearchOptions(countries, years, indicator) {
   const isOneCountry = countries.length == 1;
   const isTwoCountries = countries.length == 2;
   const isAllTime = years.length == 0;
   const isOneYear = years.length == 1;
   const isYearRange = years.length == 2;
-  if (isOneCountry && !indicator && isAllTime) getAllIndicatorsForCountryAllTime(countries[0]);
-  if (isOneCountry && indicator && isAllTime) {
-    const data = getIndicatorForCountryAllTime(countries[0], indicator);
-    return Object.keys(data) == 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
-  }
+  return { isOneCountry: isOneCountry, isTwoCountries: isTwoCountries, isAllTime: isAllTime, isOneYear: isOneYear, isYearRange: isYearRange };
 }
 
-async function getAllIndicatorsForCountryAllTime(country) {
-  return;
+async function updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters) {
+  let searchId = await getSearchId(full_query);
+  if (!searchId) {
+    await addSearch(full_query, indicator, info, query, parameters);
+    searchId = await getSearchId(full_query);
+  }
+  await addHistory(currentUser, searchId);
 }
-async function getIndicatorForCountryAllTime(country, indicator) {
-  const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=${indicator})`;
-  const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
-  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=$3)`;
-  const rawData = (await wb.queryObject(query, country, country, indicator)).rows;
-  const data = { years: [], values: [] };
-  rawData.forEach((obj) => {
-    data.years.push(obj.year);
-    data.values.push(obj.value);
-  });
-  await addSearch(full_query, indicator, query, parameters);
-  return data;
+//  const rawData = (await wb.queryObject(query, country, country, indicator)).rows;
+//  const data = { years: [], values: [] };
+//   rawData.forEach((obj) => {
+//     data.years.push(obj.year);
+//     data.values.push(obj.value);
+//   });
+// return Object.keys(data) == 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
+
+async function getHistory(server) {
+  const sessionId = server.cookies.sessionId;
+  const currentUser = await getCurrentUser(sessionId);
+  const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id WHERE user_id=$1`;
+  const history = (await users.queryObject(query, currentUser)).rows;
+  return server.json({ response: history }, 200);
 }
 
 async function getUser(username) {
@@ -123,22 +149,23 @@ async function getUser(username) {
 }
 
 async function getCurrentUser(sessionId) {
-  const query = `SELECT `;
-  const [user] = "";
+  const query = `SELECT user_id FROM sessions WHERE uuid=$1`;
+  const [user] = (await users.queryObject(query, sessionId)).rows;
+  return user ? user.user_id : user;
 }
 
-async function addSearch(full_query, search_title, p_query, params) {
-  const search_id = getSearchId(full_query);
+async function addSearch(full_query, title, info, search_query, parameters) {
+  const search_id = await getSearchId(full_query);
   if (!search_id) {
-    query = `INSERT INTO searches (full_query, title, query, parameters) VALUES ($1, $2, $3, $4)`;
-    await users.queryArray(query, full_query, search_title, p_query, params);
+    const query = `INSERT INTO searches (full_query, title,info, query, parameters) VALUES ($1, $2, $3, $4, $5)`;
+    await users.queryArray(query, full_query, title, info, search_query, parameters);
   }
 }
 
 async function getSearchId(full_query) {
-  const query = `SELECT id FROM searches WHERE query= $1`;
+  const query = `SELECT id FROM searches WHERE full_query= $1`;
   const [id] = (await users.queryObject(query, full_query)).rows;
-  return id;
+  return id ? id.id : id;
 }
 
 async function addHistory(user_id, search_id) {
