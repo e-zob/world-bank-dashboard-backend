@@ -91,7 +91,7 @@ async function search(server) {
   const { countries, years, indicator } = await server.body;
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
-  const { isOneCountry, isTwoCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
+  const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
   if (isOneCountry && !indicator && isAllTime) allIndicatorsForCountryAllTime(countries[0]);
   if (isOneCountry && indicator && isAllTime) {
     await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
@@ -99,6 +99,13 @@ async function search(server) {
   }
   if (isOneCountry && indicator && isOneYear) {
     await indicatorOneCountryOneYear(currentUser, countries[0], indicator, years[0]);
+    return server.json({ response: "Search added successfully" }, 200);
+  }
+  if (isMultipleCountries && indicator && isAllTime) {
+    indicatorCountriesAllTime();
+  }
+  if (isMultipleCountries && indicator && isOneYear) {
+    await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
   }
 }
@@ -140,13 +147,24 @@ async function indicatorOneCountryOneYear(currentUser, country, indicator, year)
   await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
 }
 
+async function indicatorCountriesAllTime(currentUser, countries, indicator) {}
+
+async function indicatorCountriesOneYear(currentUser, countries, indicator, year) {
+  const full_query = `SELECT countryname, year,value FROM indicators WHERE countrycode = ANY (SELECT countrycode FROM countries WHERE shortname = ANY (${countries}) OR longname =ANY (${countries})) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year=${year}`;
+  const query = `SELECT countryname, year,value FROM indicators WHERE countrycode = ANY(SELECT countrycode FROM countries WHERE shortname = ANY ($1) OR longname = ANY ($2)) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year=$4`;
+  const parameters = JSON.stringify({ 1: countries, 2: countries, 3: indicator, 4: year });
+  const info = JSON.stringify({ countries: [...countries], years: [year], indicator: indicator });
+  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+}
+//SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
+
 function getSearchOptions(countries, years, indicator) {
   const isOneCountry = countries.length == 1;
-  const isTwoCountries = countries.length == 2;
+  const isMultipleCountries = countries.length > 1;
   const isAllTime = years.length == 0;
   const isOneYear = years.length == 1;
   const isYearRange = years.length == 2;
-  return { isOneCountry: isOneCountry, isTwoCountries: isTwoCountries, isAllTime: isAllTime, isOneYear: isOneYear, isYearRange: isYearRange };
+  return { isOneCountry: isOneCountry, isMultipleCountries: isMultipleCountries, isAllTime: isAllTime, isOneYear: isOneYear, isYearRange: isYearRange };
 }
 
 async function updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters) {
