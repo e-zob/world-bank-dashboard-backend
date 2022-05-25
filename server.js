@@ -31,6 +31,7 @@ app
   .delete("/users", deleteAccount) //testing only
   .post("/search", search)
   .get("/history", getHistory)
+  .get("search/:searchId", getSearch)
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -91,21 +92,38 @@ async function search(server) {
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
   const { isOneCountry, isTwoCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
-  if (isOneCountry && !indicator && isAllTime) AllIndicatorsForCountryAllTime(countries[0]);
+  if (isOneCountry && !indicator && isAllTime) allIndicatorsForCountryAllTime(countries[0]);
   if (isOneCountry && indicator && isAllTime) {
-    await IndicatorForCountryAllTime(currentUser, countries[0], indicator);
+    await indicatorForCountryAllTime(currentUser, countries[0], indicator);
     return server.json({ response: "Search added successfully" }, 200);
   }
 }
 
-async function AllIndicatorsForCountryAllTime(country) {
+async function getHistory(server) {
+  const sessionId = server.cookies.sessionId;
+  const currentUser = await getCurrentUser(sessionId);
+  const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id WHERE user_id=$1`;
+  const history = (await users.queryObject(query, currentUser)).rows;
+  return server.json({ response: history }, 200);
+}
+
+async function getSearch(server) {
+  const { searchId } = server.params;
+  const query = `SELECT query, parameters FROM searches WHERE id=$1`;
+  const [searchDetails] = (await users.queryObject(query, searchId)).rows;
+  const params = Object.values(searchDetails.parameters);
+  const data = (await wb.queryObject(searchDetails.query, ...params)).rows;
+  return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
+}
+
+async function allIndicatorsForCountryAllTime(country) {
   return;
 }
-async function IndicatorForCountryAllTime(currentUser, country, indicator) {
+async function indicatorForCountryAllTime(currentUser, country, indicator) {
   const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=${indicator})`;
   const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
   const info = JSON.stringify({ countries: [country], years: [] });
-  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND IndicatorCode=(SELECT indicatorcode FROM series WHERE indicatorname=$3)`;
+  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3)`;
   await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
 }
 
@@ -125,21 +143,6 @@ async function updateSearchesHistoryTables(currentUser, full_query, indicator, i
     searchId = await getSearchId(full_query);
   }
   await addHistory(currentUser, searchId);
-}
-//  const rawData = (await wb.queryObject(query, country, country, indicator)).rows;
-//  const data = { years: [], values: [] };
-//   rawData.forEach((obj) => {
-//     data.years.push(obj.year);
-//     data.values.push(obj.value);
-//   });
-// return Object.keys(data) == 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
-
-async function getHistory(server) {
-  const sessionId = server.cookies.sessionId;
-  const currentUser = await getCurrentUser(sessionId);
-  const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id WHERE user_id=$1`;
-  const history = (await users.queryObject(query, currentUser)).rows;
-  return server.json({ response: history }, 200);
 }
 
 async function getUser(username) {
