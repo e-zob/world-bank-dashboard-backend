@@ -70,3 +70,22 @@ async function getUser(username) {
   const [user] = (await users.queryObject(query, username)).rows;
   return user;
 }
+
+async function addSearch(search_query, search_title) {
+  const search_id = getSearchId(search_query);
+  if (!search_id) {
+    query = `INSERT INTO searches (query, title) VALUES ($1, $2)`;
+    await users.queryArray(query, search_query, search_title);
+  }
+}
+
+async function getSearchId(search_query) {
+  const query = `SELECT id FROM searches WHERE query= $1`;
+  const [id] = (await users.queryObject(query, search_query)).rows;
+  return id;
+}
+
+async function addHistory(user_id, search_id) {
+  const query = `INSERT INTO history (user_id, search_id) VALUES ($1, $2)`;
+  await users.queryArray(query, user_id, search_id);
+}
