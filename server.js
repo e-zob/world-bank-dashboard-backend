@@ -158,7 +158,7 @@ async function indicatorCountriesOneYear(currentUser, countries, indicator, year
 }
 //SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
 
-function getSearchOptions(countries, years, indicator) {
+function getSearchOptions(countries, years) {
   const isOneCountry = countries.length == 1;
   const isMultipleCountries = countries.length > 1;
   const isAllTime = years.length == 0;
