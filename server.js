@@ -102,7 +102,8 @@ async function search(server) {
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isMultipleCountries && indicator && isAllTime) {
-    indicatorCountriesAllTime();
+    await indicatorCountriesAllTime(currentUser, countries, indicator);
+    return server.json({ response: "Search added successfully" }, 200);
   }
   if (isMultipleCountries && indicator && isOneYear) {
     await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
@@ -120,10 +121,21 @@ async function getHistory(server) {
 
 async function getSearch(server) {
   const { searchId } = server.params;
-  const query = `SELECT query, parameters FROM searches WHERE id=$1`;
+  const query = `SELECT query, parameters, info FROM searches WHERE id=$1`;
   const [searchDetails] = (await users.queryObject(query, searchId)).rows;
   if (!searchDetails) return server.json({ response: "Search not found" }, 404);
-  const params = Object.values(searchDetails.parameters);
+  const paramsInfo = searchDetails.parameters;
+  const searchInfoCountries = searchDetails.info.countries.flat();
+  if (paramsInfo.length) {
+    const data = {};
+    for (let i = 0; i < paramsInfo.length; i++) {
+      const params = Object.values(paramsInfo[i]);
+      const result = (await wb.queryObject(searchDetails.query, ...params)).rows;
+      data[searchInfoCountries[i]] = result;
+    }
+    return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
+  }
+  const params = Object.values(paramsInfo);
   const data = (await wb.queryObject(searchDetails.query, ...params)).rows;
   return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
 }
@@ -147,7 +159,18 @@ async function indicatorOneCountryOneYear(currentUser, country, indicator, year)
   await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
 }
 
-async function indicatorCountriesAllTime(currentUser, countries, indicator) {}
+async function indicatorCountriesAllTime(currentUser, countries, indicator) {
+  const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${countries} OR longname=${countries}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator})`;
+  const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3)`;
+  const builtParams = [];
+  for (const country of countries) {
+    const obj = { 1: country, 2: country, 3: indicator };
+    builtParams.push(obj);
+  }
+  const parameters = JSON.stringify(builtParams);
+  const info = JSON.stringify({ countries: countries, years: [] });
+  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+}
 
 async function indicatorCountriesOneYear(currentUser, countries, indicator, year) {
   const full_query = `SELECT countryname, year,value FROM indicators WHERE countrycode = ANY (SELECT countrycode FROM countries WHERE shortname = ANY (${countries}) OR longname =ANY (${countries})) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year=${year}`;
