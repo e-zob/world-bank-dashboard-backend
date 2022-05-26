@@ -98,7 +98,7 @@ async function search(server) {
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isOneCountry && indicator && isOneYear) {
-    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, years[0]);
+    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, Number(years[0]));
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isMultipleCountries && indicator && isAllTime) {
@@ -187,7 +187,6 @@ async function getCurrentUser(sessionId) {
   const [user] = (await users.queryObject(query, sessionId)).rows;
 
   return user ? user.user_id : user;
-
 }
 
 async function addSearch(full_query, title, info, search_query, parameters) {
@@ -208,3 +207,8 @@ async function addHistory(user_id, search_id) {
   const query = `INSERT INTO history (user_id, search_id, created_at) VALUES ($1, $2, current_timestamp)`;
   await users.queryArray(query, user_id, search_id);
 }
+
+// SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
+// FOR country IN (SELECT DISTINCT (countryname) FROM (SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)')) AS search_countries) SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=country OR longname=country) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
+
+// SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=country OR longname=country) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)')
