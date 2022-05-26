@@ -111,6 +111,7 @@ async function search(server) {
 async function getHistory(server) {
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
+  if (!currentUser) return server.json({ response: "Not logged in" }, 400);
   const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id WHERE user_id=$1`;
   const history = (await users.queryObject(query, currentUser)).rows;
   return server.json({ response: history }, 200);
@@ -125,6 +126,7 @@ async function getSearch(server) {
     if (!currentUser) return server.json({ response: "Not logged in" }, 400);
     const history_query = `SELECT search_id, created_at FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`;
     const [searchInfo] = (await users.queryObject(history_query, currentUser)).rows;
+    if (!searchInfo) return server.json({ response: "No search by user" });
     searchId = searchInfo["search_id"];
   }
   const [searchDetails] = (await users.queryObject(query, searchId)).rows;
