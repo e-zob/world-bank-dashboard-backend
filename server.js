@@ -98,7 +98,7 @@ async function search(server) {
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isOneCountry && indicator && isOneYear) {
-    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, Number(years[0]));
+    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isMultipleCountries && indicator && isAllTime) {
