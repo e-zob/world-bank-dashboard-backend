@@ -31,7 +31,7 @@ app
   .delete("/users", deleteAccount) //testing only
   .post("/search", search)
   .get("/history", getHistory)
-  .get("search/:searchId", getSearch)
+  .get("search", getSearch)
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -92,21 +92,17 @@ async function search(server) {
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
   const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
-  if (isOneCountry && !indicator && isAllTime) allIndicatorsForCountryAllTime(countries[0]);
-  if (isOneCountry && indicator && isAllTime) {
+
+  if (isOneCountry && isAllTime) {
     await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
     return server.json({ response: "Search added successfully" }, 200);
   }
-  if (isOneCountry && indicator && isOneYear) {
-    await indicatorOneCountryOneYear(currentUser, countries[0], indicator, years[0]);
+  if (indicator && isOneYear) {
+    await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
   }
   if (isMultipleCountries && indicator && isAllTime) {
     await indicatorCountriesAllTime(currentUser, countries, indicator);
-    return server.json({ response: "Search added successfully" }, 200);
-  }
-  if (isMultipleCountries && indicator && isOneYear) {
-    await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
   }
 }
@@ -120,12 +116,20 @@ async function getHistory(server) {
 }
 
 async function getSearch(server) {
-  const { searchId } = server.params;
+  let { searchId } = await server.queryParams;
   const query = `SELECT query, parameters, info FROM searches WHERE id=$1`;
+  if (!searchId) {
+    const sessionId = server.cookies.sessionId;
+    const currentUser = await getCurrentUser(sessionId);
+    const history_query = `SELECT search_id, created_at FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`;
+    const [searchInfo] = (await users.queryObject(history_query, currentUser)).rows;
+    searchId = searchInfo["search_id"];
+  }
   const [searchDetails] = (await users.queryObject(query, searchId)).rows;
   if (!searchDetails) return server.json({ response: "Search not found" }, 404);
   const paramsInfo = searchDetails.parameters;
   const searchInfoCountries = searchDetails.info.countries.flat();
+  const searchInfoIndicators = searchDetails.info.indicator;
   if (paramsInfo.length) {
     const data = {};
     for (let i = 0; i < paramsInfo.length; i++) {
@@ -135,28 +139,35 @@ async function getSearch(server) {
     }
     return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
   }
+  if (searchInfoIndicators) {
+    const data = {};
+    for (let i = 0; i < searchInfoIndicators.length; i++) {
+      paramsInfo[3] = searchInfoIndicators[i].indicatorcode;
+      const params = Object.values(paramsInfo);
+      console.log(params);
+      const result = (await wb.queryObject(searchDetails.query, ...params)).rows;
+      data[searchInfoIndicators[i]] = result;
+    }
+    return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
+  }
   const params = Object.values(paramsInfo);
   const data = (await wb.queryObject(searchDetails.query, ...params)).rows;
   return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
 }
 
-async function allIndicatorsForCountryAllTime(country) {
-  return;
-}
 async function indicatorOneCountryAllTime(currentUser, country, indicator) {
   const full_query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator})`;
   const query = `SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3)`;
   const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator });
-  const info = JSON.stringify({ countries: [country], years: [] });
-  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
-}
-
-async function indicatorOneCountryOneYear(currentUser, country, indicator, year) {
-  const full_query = `SELECT value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=${country} OR longname=${country}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year=${year}`;
-  const query = `SELECT value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=$1 OR longname=$2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year=$4`;
-  const parameters = JSON.stringify({ 1: country, 2: country, 3: indicator, 4: year });
-  const info = JSON.stringify({ countries: [country], years: [year], indicator: indicator });
-  await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+  if (!indicator) {
+    const indicators_query = `SELECT DISTINCT(indicatorcode) FROM indicators WHERE countrycode =(SELECT countrycode FROM countries WHERE shortname = $1 OR longname = $2)`;
+    const indicators = (await wb.queryObject(indicators_query, country, country)).rows;
+    const info = JSON.stringify({ countries: [country], years: [], indicators: indicators });
+    await updateSearchesHistoryTables(currentUser, full_query, "All Indicators", info, query, parameters);
+  } else {
+    const info = JSON.stringify({ countries: [country], years: [] });
+    await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
+  }
 }
 
 async function indicatorCountriesAllTime(currentUser, countries, indicator) {
@@ -176,7 +187,7 @@ async function indicatorCountriesOneYear(currentUser, countries, indicator, year
   const full_query = `SELECT countryname, year,value FROM indicators WHERE countrycode = ANY (SELECT countrycode FROM countries WHERE shortname = ANY (${countries}) OR longname =ANY (${countries})) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year=${year}`;
   const query = `SELECT countryname, year,value FROM indicators WHERE countrycode = ANY(SELECT countrycode FROM countries WHERE shortname = ANY ($1) OR longname = ANY ($2)) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year=$4`;
   const parameters = JSON.stringify({ 1: countries, 2: countries, 3: indicator, 4: year });
-  const info = JSON.stringify({ countries: [...countries], years: [year], indicator: indicator });
+  const info = JSON.stringify({ countries: [...countries], years: [year] });
   await updateSearchesHistoryTables(currentUser, full_query, indicator, info, query, parameters);
 }
 //SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
@@ -231,7 +242,7 @@ async function addHistory(user_id, search_id) {
   await users.queryArray(query, user_id, search_id);
 }
 
-// SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
+// SELECT countryname, year,value FROM indicators WHERE countrycode =(SELECT countrycode FROM countries WHERE shortname = 'Afghanistan' OR longname = 'Afghanistan') AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
 // FOR country IN (SELECT DISTINCT (countryname) FROM (SELECT countryname, year,value FROM indicators WHERE countrycode IN (SELECT countrycode FROM countries WHERE shortname IN ('Afghanistan', 'Arab World') OR longname IN ('Afghanistan', 'Arab World')) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)')) AS search_countries) SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=country OR longname=country) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)');
 
 // SELECT year,value FROM indicators WHERE countrycode=(SELECT countrycode FROM countries WHERE shortname=country OR longname=country) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname='Age dependency ratio, old (% of working-age population)')
