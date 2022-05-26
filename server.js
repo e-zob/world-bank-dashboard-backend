@@ -126,7 +126,7 @@ async function getSearch(server) {
     if (!currentUser) return server.json({ response: "Not logged in" }, 400);
     const history_query = `SELECT search_id, created_at FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`;
     const [searchInfo] = (await users.queryObject(history_query, currentUser)).rows;
-    if (!searchInfo) return server.json({ response: "No search by user" });
+    if (!searchInfo) return server.json({ response: "No search by user" }, 404);
     searchId = searchInfo["search_id"];
   }
   const [searchDetails] = (await users.queryObject(query, searchId)).rows;
