@@ -185,7 +185,9 @@ async function getUser(username) {
 async function getCurrentUser(sessionId) {
   const query = `SELECT user_id FROM sessions WHERE uuid=$1`;
   const [user] = (await users.queryObject(query, sessionId)).rows;
+
   return user ? user.user_id : user;
+
 }
 
 async function addSearch(full_query, title, info, search_query, parameters) {
