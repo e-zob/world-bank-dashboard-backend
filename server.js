@@ -93,10 +93,11 @@ async function search(server) {
   const currentUser = await getCurrentUser(sessionId);
   const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
 
-  if (isOneCountry && isAllTime) {
-    await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
-    return server.json({ response: "Search added successfully" }, 200);
-  }
+  if (isOneCountry && isYearRange)
+    if (isOneCountry && isAllTime) {
+      await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
+      return server.json({ response: "Search added successfully" }, 200);
+    }
   if (indicator && isOneYear) {
     await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
@@ -121,6 +122,7 @@ async function getSearch(server) {
   if (!searchId) {
     const sessionId = server.cookies.sessionId;
     const currentUser = await getCurrentUser(sessionId);
+    if (!currentUser) return server.json({ response: "Not logged in" }, 400);
     const history_query = `SELECT search_id, created_at FROM history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1`;
     const [searchInfo] = (await users.queryObject(history_query, currentUser)).rows;
     searchId = searchInfo["search_id"];
