@@ -93,11 +93,10 @@ async function search(server) {
   const currentUser = await getCurrentUser(sessionId);
   const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
 
-  if (isOneCountry && isYearRange)
-    if (isOneCountry && isAllTime) {
-      await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
-      return server.json({ response: "Search added successfully" }, 200);
-    }
+  if (isOneCountry && isAllTime) {
+    await indicatorOneCountryAllTime(currentUser, countries[0], indicator);
+    return server.json({ response: "Search added successfully" }, 200);
+  }
   if (indicator && isOneYear) {
     await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
     return server.json({ response: "Search added successfully" }, 200);
