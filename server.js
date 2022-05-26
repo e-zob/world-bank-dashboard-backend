@@ -20,10 +20,6 @@ await users.connect();
 const app = new Application();
 const PORT = Number(Deno.env.get("PORT"));
 app
-  .get("/allusers", async (server) => {
-    const data = (await users.queryObject(`SELECT * FROM users`)).rows;
-    return data;
-  })
   .get("/", welcome)
   .post("/sessions", logIn)
   .delete("/sessions", logOut)
