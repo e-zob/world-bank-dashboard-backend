@@ -109,21 +109,16 @@ async function search(server) {
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
   if (!currentUser) return server.json({ response: "Not logged in" }, 400);
-  const successResponse = server.json({ response: "Search added successfully" }, 200);
   const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
 
   if (isYearRange) {
     await indicatorCountriesYearRange(currentUser, countries, indicator, years);
-    return successResponse;
-  }
-  if (isAllTime) {
+  } else if (isAllTime) {
     await indicatorCountriesAllTime(currentUser, countries, indicator);
-    return successResponse;
-  }
-  if (indicator && isOneYear) {
+  } else if (indicator && isOneYear) {
     await indicatorCountriesOneYear(currentUser, countries, indicator, years[0]);
-    return successResponse;
   }
+  server.json({ response: "Search added successfully" }, 200);
 }
 
 async function getHistory(server) {
