@@ -190,8 +190,8 @@ async function getAutocompleteOptions(server) {
 }
 
 async function indicatorCountriesYearRange(currentUser, countries, indicator, years) {
-  const full_query = `SELECT countryname, indicatorname, year,value FROM indicators WHERE countrycode = ANY (SELECT countrycode FROM countries WHERE shortname = ANY (${countries}) OR longname =ANY (${countries})) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year BETWEEN ${years[0]} AN ${years[1]}`;
-  const query = `SELECT countryname, indicatorname, year,value FROM indicators WHERE countrycode = ANY(SELECT countrycode FROM countries WHERE shortname = ANY ($1) OR longname = ANY ($2)) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year BETWEEN $4 AND $5`;
+  const full_query = `SELECT countryname, indicatorname, year,value FROM indicators WHERE countrycode = (SELECT countrycode FROM countries WHERE shortname = ${countries} OR longname =${countries}) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=${indicator}) AND year BETWEEN ${years[0]} AN ${years[1]}`;
+  const query = `SELECT countryname, indicatorname, year,value FROM indicators WHERE countrycode = (SELECT countrycode FROM countries WHERE shortname = $1 OR longname = $2) AND indicatorcode=(SELECT seriescode FROM series WHERE indicatorname=$3) AND year BETWEEN $4 AND $5`;
   const builtParams = [];
   for (const country of countries) {
     const obj = { 1: country, 2: country, 3: indicator, 4: years[0], 5: years[1] };
