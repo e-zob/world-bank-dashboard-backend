@@ -50,7 +50,7 @@ async function welcome(server) {
 async function logIn(server) {
   const { username, password } = await server.body;
   const { admin, auth } = server.queryParams;
-  const user = "";
+  let user = "";
   if (admin) {
     user = await getUser(username, True);
   } else {
