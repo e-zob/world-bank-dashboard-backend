@@ -27,9 +27,11 @@ app
   .post("/users", createAccount) //?admin=true, authorisation=SigmaLabsXYZ
   .delete("/users", deleteAccount) //testing only
   .post("/search", search)
+
   .get("/history", getHistory) //?admin=true
   .get("search", getSearch) //?search_id=ASEARCHID
   .get("/autocomplete", getAutocompleteOptions)
+
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -65,8 +67,9 @@ async function logIn(server) {
 
 async function logOut(server) {
   const sessionId = server.cookies.sessionId;
-  const query = `DELETE FROM sessions WHERE uuid = $1`;
-  await users.queryArray(query, sessionId);
+  const user = await getCurrentUser(sessionId);
+  const query = `DELETE FROM sessions WHERE user_id = $1`;
+  await users.queryArray(query, user);
 }
 
 async function createAccount(server) {
