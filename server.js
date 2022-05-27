@@ -248,7 +248,12 @@ async function updateSearchesHistoryTables(currentUser, full_query, indicator, i
 }
 
 async function getUser(username, admin = false) {
-  const query = admin ? `SELECT * FROM admins WHERE username= $1` : `SELECT * FROM admins WHERE username= $1`;
+  let query = "";
+  if (admin) {
+    query = `SELECT * FROM admins WHERE username= $1`;
+  } else {
+    query = `SELECT * FROM users WHERE username= $1`;
+  }
   const [user] = (await users.queryObject(query, username)).rows;
   return user;
 }
