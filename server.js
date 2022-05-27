@@ -30,6 +30,7 @@ app
 
   .get("/history", getHistory) //?admin=true
   .get("search", getSearch) //?search_id=ASEARCHID
+  .get("/autocomplete", getAutocompleteOptions)
 
   .use(
     abcCors({
@@ -170,6 +171,14 @@ async function getSearch(server) {
   const params = Object.values(paramsInfo);
   const data = (await wb.queryObject(searchDetails.query, ...params)).rows;
   return data.length === 0 ? server.json({ response: "Indicator or country doesn't exist" }, 404) : server.json({ response: data }, 200);
+}
+
+async function getAutocompleteOptions(server) {
+  const countriesQuery = `SELECT shortname, longname FROM countries`;
+  const indicatorQuery = `SELECT indicatorname FROM series`;
+  const countries = (await wb.queryObject(countriesQuery)).rows;
+  const indicators = (await wb.queryObject(indicatorQuery)).rows;
+  return server.json({ response: { countries: countries, indicators: indicators } }, 200);
 }
 
 async function indicatorCountriesYearRange(currentUser, countries, indicator, years) {
