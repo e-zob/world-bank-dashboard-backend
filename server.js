@@ -103,6 +103,7 @@ async function search(server) {
   const { countries, years, indicator } = await server.body;
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
+  if (!currentUser) return server.json({ response: "Not logged in" }, 400);
   const successResponse = server.json({ response: "Search added successfully" }, 200);
   const { isOneCountry, isMultipleCountries, isAllTime, isOneYear, isYearRange } = getSearchOptions(countries, years, indicator);
 
