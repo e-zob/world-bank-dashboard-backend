@@ -50,7 +50,12 @@ async function welcome(server) {
 async function logIn(server) {
   const { username, password } = await server.body;
   const { admin, auth } = server.queryParams;
-  const user = admin ? await getUser(username, True) : await getUser(username);
+  const user = "";
+  if (admin) {
+    user = await getUser(username, True);
+  } else {
+    user = await getUser(username);
+  }
   if (!user) return server.json({ response: "User not found" }, 400);
   const encryptedPassword = await bcrypt.hash(password, user.salt);
   const isValidPassword = encryptedPassword === user.password;
