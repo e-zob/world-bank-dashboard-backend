@@ -19,15 +19,18 @@ await users.connect();
 
 const app = new Application();
 const PORT = Number(Deno.env.get("PORT"));
+const auth = "SigmaLabsXYZ";
 app
   .get("/", welcome)
-  .post("/sessions", logIn)
-  .delete("/sessions", logOut)
-  .post("/users", createAccount)
+  .post("/sessions", logIn) //?admin=true
+  .delete("/sessions", logOut) //
+  .post("/users", createAccount) //?admin=true, authorisation=SigmaLabsXYZ
   .delete("/users", deleteAccount) //testing only
   .post("/search", search)
-  .get("/history", getHistory)
-  .get("/search", getSearch)
+
+  .get("/history", getHistory) //?admin=true
+  .get("search", getSearch) //?search_id=ASEARCHID
+
   .use(
     abcCors({
       origin: /^.+localhost:(3000|1234)$/,
@@ -45,7 +48,8 @@ async function welcome(server) {
 
 async function logIn(server) {
   const { username, password } = await server.body;
-  const user = await getUser(username);
+  const { admin, auth } = server.queryParams;
+  const user = admin ? await getUser(username, True) : await getUser(username);
   if (!user) return server.json({ response: "User not found" }, 400);
   const encryptedPassword = await bcrypt.hash(password, user.salt);
   const isValidPassword = encryptedPassword === user.password;
@@ -68,12 +72,22 @@ async function logOut(server) {
 }
 
 async function createAccount(server) {
-  const { username, password } = await server.body;
-  const user = await getUser(username);
+  const { username, password, auth } = await server.body;
+  const { admin } = server.queryParams;
+  let user = "";
+  let table = "";
+  if (admin) {
+    if (auth !== auth) return server.json({ response: "Wrong authorization code" }, 400);
+    user = await getUser(username, true);
+    table = "admins";
+  } else {
+    user = await getUser(username);
+    table = "users";
+  }
   if (user) return server.json({ response: "User already exists" }, 400);
   const salt = await bcrypt.genSalt();
   const encryptedPassword = await bcrypt.hash(password, salt);
-  const query = `INSERT INTO users (username, password, salt) VALUES ($1,$2,$3)`;
+  const query = `INSERT INTO ${table} (username, password, salt) VALUES ($1,$2,$3)`;
   await users.queryArray(query, username, encryptedPassword, salt);
   return server.json({ response: "Success" }, 200);
 }
@@ -106,11 +120,13 @@ async function search(server) {
 }
 
 async function getHistory(server) {
+  const { admin } = server.queryParams;
   const sessionId = server.cookies.sessionId;
   const currentUser = await getCurrentUser(sessionId);
   if (!currentUser) return server.json({ response: "Not logged in" }, 400);
-  const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id WHERE user_id=$1`;
-  const history = (await users.queryObject(query, currentUser)).rows;
+  const condition = admin ? "" : " WHERE user_id=$1";
+  const query = `SELECT history.*, searches.title, searches.info FROM history LEFT JOIN searches ON searches.id=history.search_id ${condition}`;
+  const history = admin ? (await users.queryObject(query)).rows : (await users.queryObject(query, currentUser)).rows;
   return server.json({ response: history }, 200);
 }
 
@@ -216,8 +232,8 @@ async function updateSearchesHistoryTables(currentUser, full_query, indicator, i
   await addHistory(currentUser, searchId);
 }
 
-async function getUser(username) {
-  const query = `SELECT * FROM users WHERE username= $1`;
+async function getUser(username, admin = false) {
+  const query = admin ? `SELECT * FROM admins WHERE username= $1` : `SELECT * FROM admins WHERE username= $1`;
   const [user] = (await users.queryObject(query, username)).rows;
   return user;
 }
