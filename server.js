@@ -34,7 +34,14 @@ app
 
   .use(
     abcCors({
-      origin: /^.+localhost:(3000|1234)$/,
+      origin: [
+        /^.+localhost:(3000|1234)$/,
+        "https://wb-dashboard-sigma-labs.netlify.app",
+        "https://wb-dashboard-sigma-labs.netlify.app/create-account",
+        "https://wb-dashboard-sigma-labs.netlify.app/search",
+        "https://wb-dashboard-sigma-labs.netlify.app/results",
+        "https://wb-dashboard-sigma-labs.netlify.app/user-history",
+      ],
       allowedHeaders: ["Authorization", "Content-Type", "Accept", "Origin", "User-Agent"],
       credentials: true,
     })
